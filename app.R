@@ -1,6 +1,7 @@
 # ----| Inicio |-----
 
 library(shiny)
+load("Datos.RData")
 
 Lugares<- sort(c("Dia","Carrefour","COTO","Carni-Frute/ria La Lucila",
                  "Mercado de San Telmo","Chinos","Barrio Chino"))
@@ -35,6 +36,16 @@ ui <- fluidPage(title = "Argentina Cost of Life",
                                  value = 0)
                 )
             ),
+            fluidRow(
+                column(width = 6,
+                       selectInput(inputId = "Categoria1",label = "Categoria:",
+                                   choices = c("Alquiler","Alimentos","Higiene","Transporte",
+                                               "Celulares","Gustos","Ahorro","Hogar","Miscelaneos"),
+                                   selected = "Alimentos")
+                ),
+                column(width = 6,
+                       uiOutput(outputId = "Categoria2"))
+            ),
             actionButton(inputId = "AgregarP",label = "Agregar")
         ),
         # ----| MainPanel |----
@@ -51,8 +62,35 @@ ui <- fluidPage(title = "Argentina Cost of Life",
     )
 )
 
+# ---| Server |----
+
 server <- function(input, output, session) {
-  
+    
+    output$Categoria2<- renderUI({
+        aux<- switch (input$Categoria1,
+            "Alquiler" = c("Mensualidad","Deposito"),
+            "Alimentos" = "",
+            "Higiene" = c("Cuidado Personal","Lavanderia","Limpieza"),
+            "Transporte" = "",
+            "Celulares" = c("Claro","Movistar"),
+            "Gustos" = c("Comida","Entretenimiento"),
+            "Ahorro" = "",
+            "Hogar" = "",
+            "Miscelaneos" = c("Salud","Regalos","Papeleria","Documentacion","Inversion")
+        )
+        if(length(aux) == 1){
+            return()
+        }
+        else {
+            return(selectInput(inputId = "Categoria2",label = "Sub-Categoria",
+                               choices = aux))
+        }
+    })
+    
+    observeEvent(input$AgregarP,{
+        
+    })
+    
 }
 
 shinyApp(ui, server)
