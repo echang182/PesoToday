@@ -88,9 +88,63 @@ server <- function(input, output, session) {
     })
     
     observeEvent(input$AgregarP,{
-        
+      # ----| Diario |---- 
+      p<- which(Diario$Fecha == input$Fecha)
+      if(length(p) == 1){
+        NFilasDiario<- nrow(Diario)
+        Diario$Gastado[p]<<- Diario$Gastado[p] + input$PrecioP
+        Diario$Promedio[p:NFilasDiario]<<- cumsum(Diario$Gastado)[p:NFilasDiario]/p:NFilasDiario
+        Diario$Proyeccion[p:NFilasDiario]<<- Diario$Promedio[p:NFilasDiario]*30
+      }
+      else {
+        NFilasDiario<- nrow(Diario)
+        DiferenciaFecha<- as.Date(input$Fecha) - as.Date(Diario$Fecha[NFilasDiario])
+        if(DiferenciaFecha == 1){
+          # No hay fechas sin registros
+          Promedio<- (sum(Diario$Gastado)+input$PrecioP)/(NFilasDiario + 1)
+          FilaDiario<- data.frame(Fecha=input$Fecha,
+                                  Gastado=input$PrecioP,
+                                  Promedio=Promedio,
+                                  Proyeccion=Promedio*30)
+          Diario<<- rbind(Diario,FilaDiario)
+        }
+        else {
+          # Si hay fechas sin registros
+         FechasSinRegistro<- (as.Date(Diario$Fecha[NFilasDiario]) + 1):(as.Date(input$Fecha) - 1)
+         NFechasSinRegistros<- length(FechasSinRegistro)
+         GastoAcumulado<- Diario$Promedio[NFilasDiario]
+         Promedio<- c(rep(GastoAcumulado,NFechasSinRegistros),GastoAcumulado + input$PrecioP) / (NFilasDiario + 1):(NFilasDiario + 1 + NFechasSinRegistros)
+         FilasDiario<- data.frame(Fecha=c(FechasSinRegistro,as.Date(input$Fecha)),
+                                 Gastado=c(rep(0,NFechasSinRegistros),input$PrecioP),
+                                 Promedio=Promedio,
+                                 Proyeccion=Promedio*30)
+         FilasDiario$Fecha<- as.character(FilasDiario$Fecha)
+         Diario<<- rbind(Diario,FilasDiario)
+        }
+      }
+      # ----| Mensual |---- 
+      p<- which(Mensual$Categoria == input$Categoria1)
+      Mensual$Acumulado[p]<<- Mensual$Acumulado[p] + input$PrecioP
+      Mensual$Diferencia[p]<<- Mensual$Limite[p] - Mensual$Acumulado[p] 
+      # ----| Actualizado de tablas |----
+      
+      output$DiarioT<- renderTable({
+        Diario
+      })
+      
+      output$MensualT<- renderTable({
+        Mensual
+      })
+      
     })
     
+    output$DiarioT<- renderTable({
+      Diario
+    })
+    
+    output$MensualT<- renderTable({
+      Mensual
+    })
 }
 
 shinyApp(ui, server)
