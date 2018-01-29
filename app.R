@@ -4,7 +4,7 @@ library(shiny)
 load("Datos.RData")
 
 Lugares<- sort(c("Dia","Carrefour","COTO","Carni-Frute/ria La Lucila",
-                 "Mercado de San Telmo","Chinos","Barrio Chino"))
+                 "Mercado de San Telmo","Chinos","Barrio Chino", "Otro"))
 
 # ----| UI |----
 
@@ -21,7 +21,9 @@ ui <- fluidPage(title = "Argentina Cost of Life",
                 column(width = 6,
                        selectInput(inputId = "LugarP",label = "Lugar:",
                                    choices = Lugares,selected = "Dia")       
-                )
+                ),
+                column(width = 12,
+                       uiOutput(outputId = "OtroL"))
             ),
             fluidRow(
                 column(width = 3,
@@ -64,29 +66,39 @@ ui <- fluidPage(title = "Argentina Cost of Life",
 
 # ---| Server |----
 
+
 server <- function(input, output, session) {
-    
-    output$Categoria2<- renderUI({
-        aux<- switch (input$Categoria1,
-            "Alquiler" = c("Mensualidad","Deposito"),
-            "Alimentos" = "",
-            "Higiene" = c("Cuidado Personal","Lavanderia","Limpieza"),
-            "Transporte" = "",
-            "Celulares" = c("Claro","Movistar"),
-            "Gustos" = c("Comida","Entretenimiento"),
-            "Ahorro" = "",
-            "Hogar" = "",
-            "Miscelaneos" = c("Salud","Regalos","Papeleria","Documentacion","Inversion")
-        )
-        if(length(aux) == 1){
-            return()
-        }
-        else {
-            return(selectInput(inputId = "Categoria2",label = "Sub-Categoria",
-                               choices = aux))
-        }
+  
+  output$Categoria2<- renderUI({
+    aux<- switch (input$Categoria1,
+                  "Alquiler" = c("Mensualidad","Deposito"),
+                  "Alimentos" = "",
+                  "Higiene" = c("Cuidado Personal","Lavanderia","Limpieza"),
+                  "Transporte" = "",
+                  "Celulares" = c("Claro","Movistar"),
+                  "Gustos" = c("Comida","Entretenimiento"),
+                  "Ahorro" = "",
+                  "Hogar" = "",
+                  "Miscelaneos" = c("Salud","Regalos","Papeleria","Documentacion","Inversion")
+    )
+    if(length(aux) == 1){
+      return()
+    }
+    else {
+      return(selectInput(inputId = "Categoria2",label = "Sub-Categoria",
+                         choices = aux))
+    }
     })
     
+    output$OtroL<- renderUI({
+      if(input$LugarP != "Otro"){
+        return()
+      }
+      else {
+        return(textInput(inputId = "OtroL",label = "Nombre de lugar:",placeholder = "Lugar"))
+      }
+    })
+        
     observeEvent(input$AgregarP,{
       # ----| Diario |---- 
       p<- which(Diario$Fecha == input$Fecha)
