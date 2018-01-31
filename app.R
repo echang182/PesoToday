@@ -89,9 +89,11 @@ server <- function(input, output, session) {
     }
   })
   
+  Fecha<- reactive({as.Date(input$Fecha)})
+  
   observeEvent(input$AgregarP,{
     # ----| Diario |---- 
-    p<- which(Diario$Fecha == input$Fecha)
+    p<- which(Diario$Fecha == Fecha())
     if(length(p) == 1){
       NFilasDiario<- nrow(Diario)
       Diario$Gastado[p]<<- Diario$Gastado[p] + input$PrecioP
@@ -100,27 +102,28 @@ server <- function(input, output, session) {
     }
     else {
       NFilasDiario<- nrow(Diario)
-      DiferenciaFecha<- as.Date(input$Fecha) - as.Date(Diario$Fecha[NFilasDiario])
+      DiferenciaFecha<- Fecha() - Diario$Fecha[NFilasDiario]
       if(DiferenciaFecha == 1){
         # No hay fechas sin registros
         Promedio<- (sum(Diario$Gastado)+input$PrecioP)/(NFilasDiario + 1)
-        FilaDiario<- data.frame(Fecha=input$Fecha,
+        FilaDiario<- data.frame(Fecha=Fecha(),
                                 Gastado=input$PrecioP,
                                 Promedio=Promedio,
                                 Proyeccion=Promedio*30)
+        FilaDiario$Fecha<- as.Date(as.character(FilaDiario$Fecha))
         Diario<<- rbind(Diario,FilaDiario)
       }
       else {
         # Si hay fechas sin registros
-        FechasSinRegistro<- (as.Date(Diario$Fecha[NFilasDiario]) + 1):(as.Date(input$Fecha) - 1)
+        FechasSinRegistro<- (Diario$Fecha[NFilasDiario] + 1):(Fecha() - 1)
         NFechasSinRegistros<- length(FechasSinRegistro)
         GastoAcumulado<- Diario$Promedio[NFilasDiario]
         Promedio<- c(rep(GastoAcumulado,NFechasSinRegistros),GastoAcumulado + input$PrecioP) / (NFilasDiario + 1):(NFilasDiario + 1 + NFechasSinRegistros)
-        FilasDiario<- data.frame(Fecha=c(FechasSinRegistro,as.Date(input$Fecha)),
+        FilasDiario<- data.frame(Fecha=c(FechasSinRegistro,Fecha()),
                                  Gastado=c(rep(0,NFechasSinRegistros),input$PrecioP),
                                  Promedio=Promedio,
                                  Proyeccion=Promedio*30)
-        FilasDiario$Fecha<- as.character(FilasDiario$Fecha)
+        FilasDiario$Fecha<- as.Date(as.character(FilasDiario$Fecha))
         Diario<<- rbind(Diario,FilasDiario)
       }
     }
@@ -131,6 +134,30 @@ server <- function(input, output, session) {
     
     # ----| Productos |----
 
+    if(input$Categoria1 %in% c("Alquiler","Higiene","Celulares","Gustos","Miscelaneos")){
+        FilaProducto<- data.frame(Fecha=Fecha(),
+                                  Nombre=input$NombreP,
+                                  Marca=input$MarcaP,
+                                  Lugar=input$LugarP,
+                                  Cantidad=input$CantidadP,
+                                  Unidad=input$UnidadP,
+                                  Precio=input$PrecioP,
+                                  Categoria=input$Categoria1,
+                                  SubCategoria=input$Categoria2)
+    }
+    else {
+        FilaProducto<- data.frame(Fecha=Fecha(),
+                                  Nombre=input$NombreP,
+                                  Marca=input$MarcaP,
+                                  Lugar=input$LugarP,
+                                  Cantidad=input$CantidadP,
+                                  Unidad=input$UnidadP,
+                                  Precio=input$PrecioP,
+                                  Categoria=input$Categoria1,
+                                  SubCategoria="")
+    }
+    Productos$Fecha<- as.Date(as.character(Productos$Fecha))
+    Productos<<- rbind(Productos,FilaProducto)
     
     # ----| Actualizado de tablas |----
     
@@ -145,7 +172,22 @@ server <- function(input, output, session) {
     output$ProductosT<- renderTable({
       Productos
     })
+    
+    save(Productos,Diario,Mensual,file = "Datos.RData")
   })
+  
+  output$DiarioT<- renderTable({
+      Diario
+  })
+  
+  output$MensualT<- renderTable({
+      Mensual
+  })
+  
+  output$ProductosT<- renderTable({
+      Productos
+  })
+  
 }
 
 shinyApp(ui, server)
