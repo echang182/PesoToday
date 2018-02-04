@@ -13,6 +13,7 @@ ui <- fluidPage(title = "Argentina Cost of Life",
                   # ----| SidePanel |----
                   sidebarPanel = sidebarPanel(
                     tabsetPanel(
+                        # ----| Egresos |----
                         tabPanel(title = "Egresos",
                                  dateInput(inputId = "Fecha",label = "Introducir fecha:",value = Sys.Date()),
                                  textInput(inputId = "NombreP",label = "Nombre del producto"),
@@ -50,6 +51,7 @@ ui <- fluidPage(title = "Argentina Cost of Life",
                                  ),
                                  actionButton(inputId = "AgregarP",label = "Agregar")
                         ),
+                        # ----| Ingresos |----
                         tabPanel(title = "Ingresos",
                             dateInput(inputId = "FechaIng",label = "Fecha:",value = Sys.Date()),
                             numericInput(inputId = "MontoIng",label = "Monto:",min = 0,
@@ -189,7 +191,7 @@ server <- function(input, output, session) {
       Productos
     })
     
-    save(Productos,Diario,Mensual,file = "Datos.RData")
+    save.image(file = "Datos.RData")
   })
   
   output$DiarioT<- renderTable({
@@ -217,7 +219,54 @@ server <- function(input, output, session) {
   })
   
   observeEvent(input$AgregarIng,{
+      # ----| Ingresos |----
       
+      if(input$CategoriaIng == "Sueldos"){
+          aux<- data.frame(
+              Fecha=as.Date(input$FechaIng),
+              Categoria=input$CategoriaIng,
+              SubCategoria=input$SubCategoriaIng,
+              Monto=input$MontoIng
+          )
+      }
+      else {
+          aux<- data.frame(
+              Fecha=as.Date(input$FechaIng),
+              Categoria=input$CategoriaIng,
+              SubCategoria="",
+              Monto=input$MontoIng
+          )
+      }
+      Ingreso<<- rbind(Ingreso,aux)
+      
+      # ----| Balance |----
+      
+      p<- which(Balance$Fecha == input$FechaIng)
+      if(length(p)==0){
+          FechaIng<- as.Date(input$FechaIng)
+          N<- nrow(Balance)
+          DiferenciaFechas<- Balance$Fecha[N] - FechaIng
+          if(DiferenciaFechas == 1){
+              aux<- data.frame(
+                  Fecha= as.Date(input$FechaIng),
+                  Ingreso=input$MontoIng,
+                  Egreso=0,
+                  Saldo=Balance$Saldo[nrow(Balance)] + input$MontoIng
+              )
+              Balance<<- rbind(Balance,aux)
+          }
+          else {
+              # FechasSinRegistros<- 
+          }
+      }
+      else {
+          Balance$Ingreso[p]<<- Balance$Ingreso[p] + input$MontoIng
+          for(i in p:nrow(Balance)){
+              Balance$Saldo[i]<<- Balance$Saldo[i-1] + Balance$Ingreso[i] - Balance$Egreso[i]
+          }
+      }
+      
+      # ----| Actualizar las tablas |----
   })
   
 }
