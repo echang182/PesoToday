@@ -12,41 +12,55 @@ ui <- fluidPage(title = "Argentina Cost of Life",
                 sidebarLayout(
                   # ----| SidePanel |----
                   sidebarPanel = sidebarPanel(
-                    dateInput(inputId = "Fecha",label = "Introducir fecha:",value = Sys.Date()),
-                    textInput(inputId = "NombreP",label = "Nombre del producto"),
-                    fluidRow(
-                      column(width = 6,
-                             textInput(inputId = "MarcaP",label = "Marca:")
-                      ),
-                      column(width = 6,
-                             selectInput(inputId = "LugarP",label = "Lugar:",
-                                         choices = Lugares,selected = "Dia")       
-                      )
-                    ),
-                    fluidRow(
-                      column(width = 3,
-                             numericInput(inputId = "CantidadP",label = "Cantidad:",min = 0,value = 0)
-                      ),
-                      column(width = 4,
-                             selectInput(inputId = "UnidadP",label = "Unidad:",
-                                         choices = c("Gr","Kg","Lt","Unidades"))
-                      ),
-                      column(width = 5,
-                             numericInput(inputId = "PrecioP",label = "Precio:",min = 0,step = 0.01,
-                                          value = 0)
-                      )
-                    ),
-                    fluidRow(
-                      column(width = 6,
-                             selectInput(inputId = "Categoria1",label = "Categoria:",
-                                         choices = c("Alquiler","Alimentos","Higiene","Transporte",
-                                                     "Celulares","Gustos","Ahorro","Hogar","Miscelaneos"),
-                                         selected = "Alimentos")
-                      ),
-                      column(width = 6,
-                             uiOutput(outputId = "Categoria2"))
-                    ),
-                    actionButton(inputId = "AgregarP",label = "Agregar")
+                    tabsetPanel(
+                        tabPanel(title = "Egresos",
+                                 dateInput(inputId = "Fecha",label = "Introducir fecha:",value = Sys.Date()),
+                                 textInput(inputId = "NombreP",label = "Nombre del producto"),
+                                 fluidRow(
+                                     column(width = 6,
+                                            textInput(inputId = "MarcaP",label = "Marca:")
+                                     ),
+                                     column(width = 6,
+                                            selectInput(inputId = "LugarP",label = "Lugar:",
+                                                        choices = Lugares,selected = "Dia")       
+                                     )
+                                 ),
+                                 fluidRow(
+                                     column(width = 3,
+                                            numericInput(inputId = "CantidadP",label = "Cantidad:",min = 0,value = 0)
+                                     ),
+                                     column(width = 4,
+                                            selectInput(inputId = "UnidadP",label = "Unidad:",
+                                                        choices = c("Gr","Kg","Lt","Unidades"))
+                                     ),
+                                     column(width = 5,
+                                            numericInput(inputId = "PrecioP",label = "Precio:",min = 0,step = 0.01,
+                                                         value = 0)
+                                     )
+                                 ),
+                                 fluidRow(
+                                     column(width = 6,
+                                            selectInput(inputId = "Categoria1",label = "Categoria:",
+                                                        choices = c("Alquiler","Alimentos","Higiene","Transporte",
+                                                                    "Celulares","Gustos","Ahorro","Hogar","Miscelaneos"),
+                                                        selected = "Alimentos")
+                                     ),
+                                     column(width = 6,
+                                            uiOutput(outputId = "Categoria2"))
+                                 ),
+                                 actionButton(inputId = "AgregarP",label = "Agregar")
+                        ),
+                        tabPanel(title = "Ingresos",
+                            dateInput(inputId = "FechaIng",label = "Fecha:",value = Sys.Date()),
+                            numericInput(inputId = "MontoIng",label = "Monto:",min = 0,
+                                         value = 0),
+                            selectInput(inputId = "CategoriaIng",label = "Categoria:",
+                                        choices = c("Sueldo","Ventas","Donaciones","Otros"),
+                                        selected = "Sueldo"),
+                            uiOutput("SubCategoriaIng"),
+                            actionButton(inputId = "AgregarIng",label = "Agregar")
+                        )
+                    )
                   ),
                   # ----| MainPanel |----
                   mainPanel = mainPanel(
@@ -67,6 +81,8 @@ ui <- fluidPage(title = "Argentina Cost of Life",
 # ---| Server |----
 
 server <- function(input, output, session) {
+  
+  # ----| Egresos |----  
   
   output$Categoria2<- renderUI({
     aux<- switch (input$Categoria1,
@@ -186,6 +202,22 @@ server <- function(input, output, session) {
   
   output$ProductosT<- renderTable({
       Productos
+  })
+  
+  # ----| Ingresos |-----
+  
+  output$SubCategoriaIng<- renderUI({
+      if(input$CategoriaIng == "Sueldo"){
+          return(selectInput(inputId = "SubCategoriaIng",label = "Sub-Categoria:",
+                             choices = c("Sueldo Eloy","Sueldo Yuli")))
+      }
+      else{
+          return()
+      }
+  })
+  
+  observeEvent(input$AgregarIng,{
+      
   })
   
 }
