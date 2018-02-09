@@ -1,10 +1,8 @@
 # ----| Inicio |-----
 
 library(shiny)
+library(mailR)
 load("Datos.RData")
-
-Lugares<- sort(c("Dia","Carrefour","COTO","Carni-Frute/ria La Lucila",
-                 "Mercado de San Telmo","Chinos","Barrio Chino"))
 
 # ----| UI |----
 
@@ -32,7 +30,7 @@ ui <- fluidPage(title = "Argentina Cost of Life",
                                      ),
                                      column(width = 4,
                                             selectInput(inputId = "UnidadP",label = "Unidad:",
-                                                        choices = c("Gr","Kg","Lt","Unidades"))
+                                                        choices = c("Gr","Kg","Lt","Ml","Unidades"))
                                      ),
                                      column(width = 5,
                                             numericInput(inputId = "PrecioP",label = "Precio:",min = 0,step = 0.01,
@@ -42,9 +40,7 @@ ui <- fluidPage(title = "Argentina Cost of Life",
                                  fluidRow(
                                      column(width = 6,
                                             selectInput(inputId = "Categoria1",label = "Categoria:",
-                                                        choices = c("Alquiler","Alimentos","Higiene","Transporte",
-                                                                    "Celulares","Gustos","Ahorro","Hogar","Miscelaneos"),
-                                                        selected = "Alimentos")
+                                                        choices = Categorias, selected = "Alimentos")
                                      ),
                                      column(width = 6,
                                             uiOutput(outputId = "Categoria2"))
@@ -61,6 +57,12 @@ ui <- fluidPage(title = "Argentina Cost of Life",
                                         selected = "Sueldo"),
                             uiOutput("SubCategoriaIng"),
                             actionButton(inputId = "AgregarIng",label = "Agregar")
+                        ),
+                        # ----| Opciones |----
+                        tabPanel(title = "Opciones",
+                            textInput(inputId = "correo",label = "Introducir correo:",
+                                      placeholder = "example@correo.com"),
+                            actionButton(inputId = "Enviar",label = "Enviar")
                         )
                     )
                   ),
@@ -74,7 +76,11 @@ ui <- fluidPage(title = "Argentina Cost of Life",
                                tableOutput(outputId = "MensualT")
                       ),
                       tabPanel(title = "Productos",
-                               tableOutput(outputId = "ProductosT"))
+                               tableOutput(outputId = "ProductosT")
+                      ),
+                      tabPanel(title = "Balance",
+                          tableOutput(outputId = "BalanceT")
+                      )
                     )
                   )
                 )
@@ -133,14 +139,17 @@ server <- function(input, output, session) {
       }
       else {
         # Si hay fechas sin registros
-        FechasSinRegistro<- (Diario$Fecha[NFilasDiario] + 1):(Fecha() - 1)
+        FechasSinRegistro<- as.Date((Diario$Fecha[NFilasDiario] + 1):(Fecha() - 1),
+                                    origin = '1970-01-01')
         NFechasSinRegistros<- length(FechasSinRegistro)
+        print(FechasSinRegistro)
         GastoAcumulado<- Diario$Promedio[NFilasDiario]
         Promedio<- c(rep(GastoAcumulado,NFechasSinRegistros),GastoAcumulado + input$PrecioP) / (NFilasDiario + 1):(NFilasDiario + 1 + NFechasSinRegistros)
         FilasDiario<- data.frame(Fecha=c(FechasSinRegistro,Fecha()),
                                  Gastado=c(rep(0,NFechasSinRegistros),input$PrecioP),
                                  Promedio=Promedio,
                                  Proyeccion=Promedio*30)
+        print(FilasDiario)
         FilasDiario$Fecha<- as.Date(as.character(FilasDiario$Fecha))
         Diario<<- rbind(Diario,FilasDiario)
       }
@@ -174,27 +183,74 @@ server <- function(input, output, session) {
                                   Categoria=input$Categoria1,
                                   SubCategoria="")
     }
-    Productos$Fecha<- as.Date(as.character(Productos$Fecha))
+    FilaProducto$Fecha<- as.Date(as.character(FilaProducto$Fecha))
     Productos<<- rbind(Productos,FilaProducto)
     
+    # ----| Balance |----
+    
+    p<- which(Balance$Fecha == Fecha())
+    if(length(p)==0){
+        N<- nrow(Balance)
+        DiferenciaFechas<- Balance$Fecha[N] - Fecha()
+        if(DiferenciaFechas == 1){
+            aux<- data.frame(
+                Fecha= FechaIng(),
+                Ingreso=0,
+                Egreso=input$PrecioP,
+                Saldo=Balance$Saldo[nrow(Balance)] - input$PrecioP
+            )
+            Balance<<- rbind(Balance,aux)
+        }
+        else {
+            NFilasBalance<- nrow(Balance)
+            FechasSinRegistro<- as.Date((Balance$Fecha[NFilasBalance] + 1):(Fecha() - 1),
+                                        origin = '1970-01-01')
+            NFechasSinRegistros<- length(FechasSinRegistro)
+            print(FechasSinRegistro)
+            FilasBalance<- data.frame(Fecha=c(FechasSinRegistro,Fecha()),
+                                      Ingreso=rep(0,NFechasSinRegistros + 1),
+                                      Egreso=c(rep(0,NFechasSinRegistros),input$PrecioP),
+                                      Saldo=0)
+            FilasBalance$Fecha<- as.Date(as.character(FilasBalance$Fecha))
+            Balance<<- rbind(Balance,FilasBalance)
+            for(i in (NFilasBalance + 1):nrow(Balance)){
+                Balance$Saldo[i]<<- Balance$Saldo[i-1] - Balance$Egreso[i]
+            }
+            print(FilasDiario)
+        }
+    }
+    else {
+        Balance$Egreso[p]<<- Balance$Egreso[p] + input$PrecioP
+        for(i in p:nrow(Balance)){
+            Balance$Saldo[i]<<- Balance$Saldo[i-1] + Balance$Ingreso[i] - Balance$Egreso[i]
+        }
+    }
     # ----| Actualizado de tablas |----
     
     output$DiarioT<- renderTable({
-      Diario
+        Diario$Fecha<- as.character(Diario$Fecha)
+        Diario
     })
     
     output$MensualT<- renderTable({
-      Mensual
+        Mensual
     })
     
     output$ProductosT<- renderTable({
-      Productos
+        Productos$Fecha<- as.character(Productos$Fecha)
+        Productos
+    })
+    
+    output$BalanceT<- renderTable({
+        Balance$Fecha<- as.character(Balance$Fecha)
+        Balance
     })
     
     save.image(file = "Datos.RData")
   })
   
   output$DiarioT<- renderTable({
+      Diario$Fecha<- as.character(Diario$Fecha)
       Diario
   })
   
@@ -203,7 +259,13 @@ server <- function(input, output, session) {
   })
   
   output$ProductosT<- renderTable({
+      Productos$Fecha<- as.character(Productos$Fecha)
       Productos
+  })
+  
+  output$BalanceT<- renderTable({
+      Balance$Fecha<- as.character(Balance$Fecha)
+      Balance
   })
   
   # ----| Ingresos |-----
@@ -218,12 +280,14 @@ server <- function(input, output, session) {
       }
   })
   
+  FechaIng<- reactive({as.Date(input$FechaIng)})
+  
   observeEvent(input$AgregarIng,{
       # ----| Ingresos |----
       
       if(input$CategoriaIng == "Sueldos"){
           aux<- data.frame(
-              Fecha=as.Date(input$FechaIng),
+              Fecha=FechaIng(),
               Categoria=input$CategoriaIng,
               SubCategoria=input$SubCategoriaIng,
               Monto=input$MontoIng
@@ -231,7 +295,7 @@ server <- function(input, output, session) {
       }
       else {
           aux<- data.frame(
-              Fecha=as.Date(input$FechaIng),
+              Fecha=FechaIng(),
               Categoria=input$CategoriaIng,
               SubCategoria="",
               Monto=input$MontoIng
@@ -241,14 +305,13 @@ server <- function(input, output, session) {
       
       # ----| Balance |----
       
-      p<- which(Balance$Fecha == input$FechaIng)
+      p<- which(Balance$Fecha == FechaIng())
       if(length(p)==0){
-          FechaIng<- as.Date(input$FechaIng)
           N<- nrow(Balance)
-          DiferenciaFechas<- Balance$Fecha[N] - FechaIng
+          DiferenciaFechas<- Balance$Fecha[N] - FechaIng()
           if(DiferenciaFechas == 1){
               aux<- data.frame(
-                  Fecha= as.Date(input$FechaIng),
+                  Fecha= FechaIng(),
                   Ingreso=input$MontoIng,
                   Egreso=0,
                   Saldo=Balance$Saldo[nrow(Balance)] + input$MontoIng
@@ -256,7 +319,20 @@ server <- function(input, output, session) {
               Balance<<- rbind(Balance,aux)
           }
           else {
-              # FechasSinRegistros<- 
+              NFilasBalance<- nrow(Balance)
+              FechasSinRegistro<- as.Date((Balance$Fecha[NFilasBalance] + 1):(FechaIng() - 1),
+                                          origin = '1970-01-01')
+              NFechasSinRegistros<- length(FechasSinRegistro)
+              print(FechasSinRegistro)
+              FilasBalance<- data.frame(Fecha=c(FechasSinRegistro,FechaIng()),
+                                       Ingreso=c(rep(0,NFechasSinRegistros),input$MontoIng),
+                                       Egreso=rep(0,NFechasSinRegistros + 1),
+                                       Saldo=0)
+              FilasBalance$Fecha<- as.Date(as.character(FilasBalance$Fecha))
+              Balance<<- rbind(Balance,FilasBalance)
+              for(i in (NFilasBalance + 1):nrow(Balance)){
+                  Balance$Saldo[i]<<- Balance$Saldo[i-1] + Balance$Ingreso[i]
+              }
           }
       }
       else {
@@ -267,8 +343,39 @@ server <- function(input, output, session) {
       }
       
       # ----| Actualizar las tablas |----
+      
+      output$DiarioT<- renderTable({
+          Diario$Fecha<- as.character(Diario$Fecha)
+          Diario
+      })
+      
+      output$MensualT<- renderTable({
+          Mensual
+      })
+      
+      output$ProductosT<- renderTable({
+          Productos$Fecha<- as.character(Productos$Fecha)
+          Productos
+      })
+      
+      output$BalanceT<- renderTable({
+          Balance$Fecha<- as.character(Balance$Fecha)
+          Balance
+      })
+      
+      save.image(file = "Datos.RData")
   })
   
+  # ----| Opciones |-----
+  
+  observeEvent(input$Enviar,{
+      send.mail(from = "epsilon.datalabs@gmail.com",to = input$correo,
+                subject = "RespaldoDatos",
+                body = paste("Respado generado el:",Sys.time()),authenticate = TRUE,
+                smtp = list(host.name = "smtp.gmail.com", port = 465, user.name = "epsilon.datalabs", passwd = "$c6219_s51", ssl = TRUE),
+                attach.files = "Datos.RData",
+                send = TRUE)
+  })
 }
 
 shinyApp(ui, server)
